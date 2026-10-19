@@ -1,0 +1,57 @@
+{
+  "name": "pausecut",
+  "version": "0.1.0",
+  "description": "Voice-activity based pause detection and cut-list generation for talk-heavy video (commentary, podcasts, gameplay). Exports Premiere Pro XML, EDL, JSON cut lists, or renders directly with ffmpeg.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "pausecut": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "models",
+    "ui",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "video",
+    "editing",
+    "silence",
+    "pause",
+    "vad",
+    "silero",
+    "premiere",
+    "xmeml",
+    "edl",
+    "ffmpeg",
+    "jump-cut"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "onnxruntime-node": "^1.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "typescript": "^7.0.0"
+  },
+  "author": "chocochocopipip",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chocochocopipip/pausecut.git"
+  },
+  "homepage": "https://github.com/chocochocopipip/pausecut#readme",
+  "bugs": {
+    "url": "https://github.com/chocochocopipip/pausecut/issues"
+  }
+}

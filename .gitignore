@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.pausecut.json
+*.pausecut.csv
+*.pausecut.xml
+*.pausecut.edl

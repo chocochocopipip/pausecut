@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pausecut review</title>
+<style>
+  :root {
+    --bg: #1b1f26;
+    --panel: #232932;
+    --panel-2: #2b323c;
+    --line: #38414d;
+    --text: #e6e9ee;
+    --muted: #8f9aa8;
+    --speech: #5b6675;
+    --cut: #f0a04b;
+    --squeeze: #4cc9b0;
+    --marker: #a899ff;
+    --keep: #6f7b8a;
+    --focus: #ffd27a;
+    --radius: 6px;
+    font-family: "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .app { display: grid; grid-template-columns: 270px minmax(0, 1fr) 460px; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+  header { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 18px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  header .file { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+  header .stats { margin-left: auto; display: flex; gap: 18px; font-variant-numeric: tabular-nums; }
+  header .stats b { font-weight: 600; }
+  header .stats .delta { color: var(--cut); }
+
+  aside, main, section.list { min-height: 0; }
+  aside { border-right: 1px solid var(--line); padding: 14px 16px; overflow: auto; background: var(--panel); }
+  section.list { border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--panel); }
+  main { display: flex; flex-direction: column; padding: 14px 16px; gap: 10px; overflow: auto; }
+
+  h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 10px; letter-spacing: .02em; }
+  .ctl { display: grid; grid-template-columns: 1fr 64px; align-items: center; gap: 6px 10px; margin-bottom: 12px; }
+  .ctl label { grid-column: 1 / -1; display: flex; justify-content: space-between; color: var(--text); }
+  .ctl label small { color: var(--muted); }
+  .ctl input[type=range] { width: 100%; accent-color: var(--cut); }
+  .ctl input[type=number] { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; text-align: right; font-variant-numeric: tabular-nums; }
+  .ctl.toggle { grid-template-columns: 1fr auto; }
+  .ctl.toggle input { accent-color: var(--squeeze); }
+  .tier-legend { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; font-size: 12px; color: var(--muted); margin: 6px 0 14px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+  .btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 12px; }
+  .btn:hover { border-color: #4a5563; }
+  .btn.primary { background: var(--cut); border-color: var(--cut); color: #1b1f26; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .error { color: var(--cut); font-size: 12px; min-height: 1.2em; }
+
+  video { width: 100%; max-height: 52vh; background: #000; border-radius: var(--radius); outline: none; }
+  audio { width: 100%; }
+  .timeline { position: relative; height: 56px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: crosshair; }
+  .timeline canvas { width: 100%; height: 100%; display: block; }
+  .transport { display: flex; align-items: center; gap: 10px; }
+  .transport .time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 14ch; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .seg button { background: transparent; border: 0; padding: 6px 12px; color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed=true] { background: var(--panel-2); color: var(--text); }
+  .hint { color: var(--muted); font-size: 12px; }
+  kbd { font-family: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; font-size: 11px; }
+
+  .list-head { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .list-head select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+  .list-head .count { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .rows { overflow: auto; flex: 1; }
+  .gap { display: grid; grid-template-columns: 4px 1fr auto; gap: 0 10px; padding: 8px 12px 8px 10px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: center; }
+  .gap:hover { background: var(--panel-2); }
+  .gap[aria-selected=true] { background: #313a46; }
+  .gap .bar { height: 100%; min-height: 34px; border-radius: 2px; background: var(--keep); }
+  .gap .main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .gap .t { font-variant-numeric: tabular-nums; }
+  .gap .t b { font-weight: 600; }
+  .gap .meta { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gap .meta .ov { color: var(--focus); }
+  .gap .actions { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .gap .actions button { border: 0; background: transparent; color: var(--muted); padding: 4px 8px; font-size: 12px; }
+  .gap .actions button + button { border-left: 1px solid var(--line); }
+  .gap .actions button[aria-pressed=true] { color: #1b1f26; font-weight: 600; }
+  .gap .actions button[aria-pressed=true][data-a=keep] { background: var(--keep); color: var(--text); }
+  .gap .actions button[aria-pressed=true][data-a=cut] { background: var(--cut); }
+  .gap .actions button[aria-pressed=true][data-a=squeeze] { background: var(--squeeze); }
+  .gap .actions button[aria-pressed=true][data-a=marker] { background: var(--marker); }
+  .gap[data-a=cut] .bar { background: var(--cut); }
+  .gap[data-a=squeeze] .bar { background: var(--squeeze); }
+  .gap[data-a=marker] .bar { background: var(--marker); }
+  .list-foot { padding: 12px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+  .empty { padding: 40px 20px; color: var(--muted); text-align: center; }
+
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; width: min(520px, 92vw); }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog h3 { margin: 0 0 12px; font-size: 15px; }
+  dialog .opts { display: grid; gap: 8px; margin-bottom: 14px; }
+  dialog .opts label { display: flex; gap: 8px; align-items: center; }
+  dialog .opts input[type=checkbox] { accent-color: var(--cut); }
+  dialog .opts input[type=text], dialog .opts input[type=number] { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; flex: 1; }
+  dialog .opts .sub { margin-left: 26px; display: flex; gap: 8px; align-items: center; color: var(--muted); }
+  .progress { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin: 10px 0; }
+  .progress i { display: block; height: 100%; background: var(--squeeze); width: 0; transition: width .3s; }
+  .log { font-size: 12px; color: var(--muted); max-height: 160px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .log .ok { color: var(--squeeze); }
+
+  @media (max-width: 1100px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto auto auto minmax(300px, 1fr); }
+    aside, section.list { border: 0; border-top: 1px solid var(--line); }
+    header .file { max-width: 20ch; }
+  }
+  @media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>pausecut</h1>
+    <span class="file" id="fileName"></span>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <aside>
+    <h2>しきい値</h2>
+    <div class="tier-legend">
+      <span><i class="swatch" style="background:var(--cut)"></i>カット</span><span>間を丸ごと削除</span>
+      <span><i class="swatch" style="background:var(--squeeze)"></i>詰める</span><span>短く詰めてジャンプカット</span>
+      <span><i class="swatch" style="background:var(--marker)"></i>マーカー</span><span>残してマーカーだけ打つ</span>
+      <span><i class="swatch" style="background:var(--keep)"></i>残す</span><span>触らない</span>
+    </div>
+    <div id="controls"></div>
+    <div class="row">
+      <button class="btn ghost" id="resetCfg">しきい値を元に戻す</button>
+    </div>
+    <div class="error" id="cfgError"></div>
+  </aside>
+
+  <main>
+    <div id="player"></div>
+    <div class="timeline" id="timeline" title="クリックで移動"><canvas id="tl"></canvas></div>
+    <div class="transport">
+      <button class="btn" id="playBtn">再生</button>
+      <span class="time" id="timeLabel">0:00.0 / 0:00.0</span>
+      <div class="seg" role="group" aria-label="再生モード">
+        <button id="modeOrig" aria-pressed="true">元の映像</button>
+        <button id="modeCut" aria-pressed="false">カット後プレビュー</button>
+      </div>
+      <button class="btn" id="playSel" disabled>選択した候補を再生</button>
+    </div>
+    <p class="hint"><kbd>↑</kbd><kbd>↓</kbd> 候補を移動 · <kbd>Space</kbd> 再生/停止 · <kbd>1</kbd>残す <kbd>2</kbd>カット <kbd>3</kbd>詰める <kbd>4</kbd>マーカー · <kbd>P</kbd> モード切替 · <kbd>0</kbd> 上書きを解除</p>
+  </main>
+
+  <section class="list">
+    <div class="list-head">
+      <select id="filter">
+        <option value="all">すべての候補</option>
+        <option value="cut">カットのみ</option>
+        <option value="squeeze">詰めるのみ</option>
+        <option value="marker">マーカーのみ</option>
+        <option value="keep">残すのみ</option>
+        <option value="overridden">手で変えたもの</option>
+      </select>
+      <label class="hint"><input type="checkbox" id="showMicro"> 短い間も表示</label>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="rows" id="rows" role="listbox" aria-label="カット候補"></div>
+    <div class="list-foot">
+      <button class="btn ghost" id="clearOv">上書きをすべて解除</button>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="applyBtn">書き出す…</button>
+    </div>
+  </section>
+</div>
+
+<dialog id="applyDlg">
+  <h3>書き出し</h3>
+  <div class="opts">
+    <label><input type="checkbox" id="oXml" checked> Premiere Pro 用 XML（シーケンス＋マーカー）</label>
+    <label><input type="checkbox" id="oEdl"> EDL</label>
+    <label><input type="checkbox" id="oCsv"> CSV（判定一覧）</label>
+    <label><input type="checkbox" id="oJson" checked> JSON（この状態を保存）</label>
+    <label><input type="checkbox" id="oRender"> ffmpeg でカット済み動画を書き出す</label>
+    <div class="sub"><span>ファイル名</span><input type="text" id="oRenderName" placeholder="空なら <元の名前>_cut.mp4"><span>CRF</span><input type="number" id="oCrf" value="20" min="10" max="35" style="width:64px;flex:0"></div>
+    <label><span style="min-width:90px">出力先</span><input type="text" id="oDir"></label>
+  </div>
+  <div class="progress" id="progress" hidden><i></i></div>
+  <div class="log" id="jobLog"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px">
+    <button class="btn ghost" id="applyCancel">閉じる</button>
+    <button class="btn primary" id="applyGo">書き出す</button>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const fmt = (s) => { s = Math.max(0, s); const m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r.toFixed(1).padStart(4, "0")}`; };
+  const fmtL = (s) => { const h = Math.floor(s / 3600); return (h ? h + ":" : "") + fmt(s - h * 3600).padStart(h ? 6 : 0, "0"); };
+  const ACTIONS = [["keep", "残す"], ["cut", "カット"], ["squeeze", "詰める"], ["marker", "マーカー"]];
+  const CONTROLS = [
+    { path: "vad.threshold", label: "声の判定感度", hint: "低いほど小さな声も拾う", min: 0.2, max: 0.9, step: 0.05 },
+    { path: "tiers.cutMin", label: "カットする最短の間", hint: "秒", min: 0.1, max: 2, step: 0.05 },
+    { path: "tiers.squeezeMin", label: "詰めるに切り替える長さ", hint: "秒", min: 0.3, max: 5, step: 0.1 },
+    { path: "tiers.squeezeTo", label: "詰めた後の長さ", hint: "秒", min: 0.1, max: 2, step: 0.05 },
+    { path: "tiers.markerMin", label: "マーカーだけにする長さ", hint: "秒", min: 1, max: 15, step: 0.5 },
+    { path: "tiers.padBefore", label: "声の後に残す余白", hint: "秒", min: 0, max: 0.5, step: 0.01 },
+    { path: "tiers.padAfter", label: "声の前に残す余白", hint: "秒", min: 0, max: 0.5, step: 0.01 },
+    { path: "motion.stillThreshold", label: "画面が止まっていると見なす値", hint: "差分 0–255", min: 0, max: 20, step: 0.5 },
+  ];
+
+  let state = null;          // server state
+  let selected = -1;         // gap index
+  let mode = "orig";         // orig | cut
+  let stopAt = null;         // auto-pause time when previewing a candidate
+  let media = null;          // <video> or <audio>
+  const get = (o, p) => p.split(".").reduce((x, k) => x?.[k], o);
+
+  // ---------- data ----------
+  async function api(path, body) {
+    const r = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+    return j;
+  }
+  function setState(s) {
+    state = s;
+    if (selected >= s.analysis.gaps.length) selected = -1;
+    renderAll();
+  }
+
+  // ---------- rendering ----------
+  function renderAll() {
+    const a = state.analysis;
+    $("#fileName").textContent = state.sourceName + (state.media.isProxy ? "（プロキシで再生中）" : "");
+    const st = a.stats;
+    $("#timeLabel").textContent = `${fmtL(media ? media.currentTime : 0)} / ${fmtL(a.source.duration)}`;
+    $("#stats").innerHTML = `<span>${fmtL(st.sourceDuration)} → <b>${fmtL(st.outputDuration)}</b></span><span class="delta">−${fmtL(st.removed)}（${st.removedPercent}%）</span><span>候補 ${a.gaps.length}</span>`;
+    if (!media) buildPlayer();
+    renderControls();
+    renderList();
+    drawTimeline();
+    $("#playSel").disabled = selected < 0;
+  }
+
+  function buildPlayer() {
+    const a = state.analysis;
+    media = document.createElement(a.source.hasVideo ? "video" : "audio");
+    media.src = state.media.url;
+    media.controls = false;
+    media.preload = "auto";
+    if (!a.source.hasVideo) media.controls = true;
+    $("#player").replaceChildren(media);
+    media.addEventListener("timeupdate", onTime);
+    media.addEventListener("play", () => $("#playBtn").textContent = "停止");
+    media.addEventListener("pause", () => $("#playBtn").textContent = "再生");
+    media.addEventListener("click", togglePlay);
+  }
+
+  function renderControls() {
+    const cfg = state.config;
+    const box = $("#controls");
+    if (!box.children.length) {
+      for (const c of CONTROLS) {
+        const d = document.createElement("div");
+        d.className = "ctl";
+        d.innerHTML = `<label>${c.label}<small>${c.hint}</small></label><input type="range" min="${c.min}" max="${c.max}" step="${c.step}" data-p="${c.path}"><input type="number" min="${c.min}" max="${c.max}" step="${c.step}" data-p="${c.path}">`;
+        box.appendChild(d);
+      }
+      const m = document.createElement("div");
+      m.className = "ctl toggle";
+      m.innerHTML = `<label>画面の動きを見て判定を変える<small>動いていれば残す</small></label><input type="checkbox" data-p="motion.enabled">`;
+      box.appendChild(m);
+      box.addEventListener("input", onCtl);
+      box.addEventListener("change", onCtl);
+    }
+    for (const el of box.querySelectorAll("input")) {
+      const v = get(cfg, el.dataset.p);
+      if (el.type === "checkbox") el.checked = !!v;
+      else if (document.activeElement !== el) el.value = v;
+    }
+    const motionAvailable = state.analysis.source.hasVideo;
+    box.querySelector('[data-p="motion.enabled"]').disabled = !motionAvailable;
+  }
+
+  let ctlTimer = null;
+  function onCtl(e) {
+    const el = e.target;
+    const p = el.dataset.p;
+    if (!p) return;
+    const v = el.type === "checkbox" ? el.checked : parseFloat(el.value);
+    if (el.type !== "checkbox" && Number.isNaN(v)) return;
+    // mirror range <-> number
+    for (const other of el.parentElement.querySelectorAll(`input[data-p="${p}"]`)) if (other !== el) other.value = v;
+    clearTimeout(ctlTimer);
+    ctlTimer = setTimeout(async () => {
+      const patch = {};
+      const [a, b] = p.split(".");
+      patch[a] = { [b]: v };
+      try {
+        $("#cfgError").textContent = "";
+        setState(await api("/api/config", { config: patch }));
+      } catch (err) {
+        $("#cfgError").textContent = err.message;
+      }
+    }, 120);
+  }
+
+  function visibleGaps() {
+    const f = $("#filter").value;
+    const micro = $("#showMicro").checked;
+    return state.analysis.gaps.filter((g) => {
+      if (!micro && g.tier === "micro") return false;
+      if (f === "all") return true;
+      if (f === "overridden") return state.overrides[g.index] !== undefined;
+      return g.action === f;
+    });
+  }
+
+  function renderList() {
+    const rows = $("#rows");
+    const gaps = visibleGaps();
+    $("#count").textContent = `${gaps.length} 件`;
+    if (!gaps.length) { rows.innerHTML = `<div class="empty">この条件に合う候補はありません</div>`; return; }
+    const frag = document.createDocumentFragment();
+    for (const g of gaps) {
+      const d = document.createElement("div");
+      d.className = "gap";
+      d.dataset.a = g.action;
+      d.dataset.i = g.index;
+      d.setAttribute("role", "option");
+      d.setAttribute("aria-selected", g.index === selected);
+      const ov = state.overrides[g.index] !== undefined;
+      const motion = g.motion === undefined ? "" : ` · 動き ${g.motion.toFixed(1)}${g.motionLevel === "still" ? "（静止）" : "（動あり）"}`;
+      const saved = g.saved ? ` · −${g.saved.toFixed(2)}s` : "";
+      d.innerHTML = `<i class="bar"></i>
+        <div class="main">
+          <div class="t"><b>${fmtL(g.start)}</b> <span style="color:var(--muted)">→ ${fmtL(g.end)}</span> &nbsp; ${g.duration.toFixed(2)}s</div>
+          <div class="meta">${ov ? '<span class="ov">手で変更</span> · ' : ""}${reasonJa(g)}${motion}${saved}</div>
+        </div>
+        <div class="actions" role="group">${ACTIONS.map(([k, l]) => `<button data-a="${k}" aria-pressed="${g.action === k}" title="${l}">${l}</button>`).join("")}</div>`;
+      frag.appendChild(d);
+    }
+    rows.replaceChildren(frag);
+    const sel = rows.querySelector('[aria-selected="true"]');
+    if (sel) sel.scrollIntoView({ block: "nearest" });
+  }
+
+  function reasonJa(g) {
+    const r = g.reason;
+    if (r === "manual override") return "手動";
+    if (g.tier === "edge") return "先頭／末尾の無音";
+    if (g.tier === "micro") return "短い間";
+    const base = { cut: "カット帯", squeeze: "詰める帯", long: "長い間" }[g.tier] || g.tier;
+    if (/no on-screen motion/.test(r)) return `${base}・画面が止まっているので強めに`;
+    if (/on-screen motion/.test(r)) return `${base}・画面が動いているので控えめに`;
+    return base;
+  }
+
+  // ---------- timeline ----------
+  const canvas = $("#tl");
+  function drawTimeline() {
+    const a = state.analysis;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const D = a.source.duration;
+    const x = (t) => (t / D) * W;
+    const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    ctx.clearRect(0, 0, W, H);
+    // speech
+    ctx.fillStyle = css("--speech");
+    for (const s of a.speech) ctx.fillRect(x(s.start), 18, Math.max(1, x(s.end) - x(s.start)), 20);
+    // gaps
+    for (const g of a.gaps) {
+      if (g.action === "keep") continue;
+      ctx.fillStyle = css("--" + g.action);
+      ctx.fillRect(x(g.start), 14, Math.max(2, x(g.end) - x(g.start)), 28);
+      if (g.index === selected) {
+        ctx.strokeStyle = css("--focus"); ctx.lineWidth = 2;
+        ctx.strokeRect(x(g.start) - 1, 8, Math.max(2, x(g.end) - x(g.start)) + 2, 40);
+      }
+    }
+    if (selected >= 0 && a.gaps[selected].action === "keep") {
+      const g = a.gaps[selected];
+      ctx.strokeStyle = css("--focus"); ctx.lineWidth = 2;
+      ctx.strokeRect(x(g.start) - 1, 8, Math.max(2, x(g.end) - x(g.start)) + 2, 40);
+    }
+    // playhead
+    if (media) {
+      ctx.fillStyle = css("--text");
+      ctx.fillRect(x(media.currentTime) - 1, 0, 2, H);
+    }
+  }
+  $("#timeline").addEventListener("click", (e) => {
+    const r = canvas.getBoundingClientRect();
+    media.currentTime = ((e.clientX - r.left) / r.width) * state.analysis.source.duration;
+    stopAt = null;
+  });
+  window.addEventListener("resize", () => state && drawTimeline());
+
+  // ---------- playback ----------
+  function onTime() {
+    const t = media.currentTime;
+    $("#timeLabel").textContent = `${fmtL(t)} / ${fmtL(state.analysis.source.duration)}`;
+    if (mode === "cut" && !media.paused) {
+      for (const g of state.analysis.gaps) {
+        for (const r of g.removed) {
+          if (t >= r.start && t < r.end - 0.02) { media.currentTime = r.end; break; }
+        }
+      }
+    }
+    if (stopAt !== null && t >= stopAt) { media.pause(); stopAt = null; }
+    drawTimeline();
+  }
+  function togglePlay() { if (media.paused) media.play(); else media.pause(); }
+  function playSelected() {
+    if (selected < 0) return;
+    const g = state.analysis.gaps[selected];
+    const lead = 1.5, tail = 1.5;
+    media.currentTime = Math.max(0, g.start - lead);
+    stopAt = Math.min(state.analysis.source.duration, g.end + tail);
+    media.play();
+  }
+  function setMode(m) {
+    mode = m;
+    $("#modeOrig").setAttribute("aria-pressed", m === "orig");
+    $("#modeCut").setAttribute("aria-pressed", m === "cut");
+  }
+  $("#playBtn").addEventListener("click", togglePlay);
+  $("#playSel").addEventListener("click", playSelected);
+  $("#modeOrig").addEventListener("click", () => setMode("orig"));
+  $("#modeCut").addEventListener("click", () => setMode("cut"));
+
+  // ---------- selection & overrides ----------
+  function select(i, play = true) {
+    selected = i;
+    renderList();
+    drawTimeline();
+    $("#playSel").disabled = selected < 0;
+    if (play) playSelected();
+  }
+  $("#rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-a]");
+    const row = e.target.closest(".gap");
+    if (!row) return;
+    const i = +row.dataset.i;
+    if (btn) {
+      e.stopPropagation();
+      const g = state.analysis.gaps[i];
+      // clicking the current (auto) action again clears the override
+      const action = btn.dataset.a === g.action && state.overrides[i] !== undefined ? null : btn.dataset.a;
+      selected = i;
+      setState(await api("/api/override", { index: i, action }));
+      return;
+    }
+    select(i, true);
+  });
+  $("#clearOv").addEventListener("click", async () => setState(await api("/api/overrides/clear", {})));
+  $("#resetCfg").addEventListener("click", async () => { setState(await api("/api/config", { reset: true })); });
+  $("#filter").addEventListener("change", renderList);
+  $("#showMicro").addEventListener("change", renderList);
+
+  document.addEventListener("keydown", async (e) => {
+    if (e.target.matches("input, select, textarea") || $("#applyDlg").open) return;
+    const gaps = visibleGaps();
+    const pos = gaps.findIndex((g) => g.index === selected);
+    if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); if (gaps.length) select(gaps[Math.min(gaps.length - 1, pos + 1)].index); }
+    else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); if (gaps.length) select(gaps[Math.max(0, pos - 1)].index); }
+    else if (e.key === " ") { e.preventDefault(); togglePlay(); }
+    else if (e.key === "p") setMode(mode === "orig" ? "cut" : "orig");
+    else if (/^[1-4]$/.test(e.key) && selected >= 0) setState(await api("/api/override", { index: selected, action: ACTIONS[+e.key - 1][0] }));
+    else if (e.key === "0" && selected >= 0) setState(await api("/api/override", { index: selected, action: null }));
+    else if (e.key === "Enter" && selected >= 0) playSelected();
+  });
+
+  // ---------- apply ----------
+  const dlg = $("#applyDlg");
+  $("#applyBtn").addEventListener("click", () => {
+    $("#oDir").value = state.outDir;
+    $("#jobLog").textContent = "";
+    $("#progress").hidden = true;
+    $("#applyGo").disabled = false;
+    dlg.showModal();
+  });
+  $("#applyCancel").addEventListener("click", () => dlg.close());
+  $("#applyGo").addEventListener("click", async () => {
+    const body = {
+      xml: $("#oXml").checked, edl: $("#oEdl").checked, csv: $("#oCsv").checked, json: $("#oJson").checked,
+      render: $("#oRender").checked, renderOutput: $("#oRenderName").value, crf: parseFloat($("#oCrf").value) || 20,
+      outDir: $("#oDir").value,
+    };
+    $("#applyGo").disabled = true;
+    $("#progress").hidden = !body.render;
+    $("#jobLog").textContent = "";
+    try {
+      await api("/api/apply", body);
+      poll();
+    } catch (err) {
+      $("#jobLog").textContent = err.message;
+      $("#applyGo").disabled = false;
+    }
+  });
+  async function poll() {
+    const { job } = await api("/api/job");
+    $("#progress i").style.width = `${Math.round(job.progress * 100)}%`;
+    $("#jobLog").innerHTML = job.log.map((l) => `<div class="${/^(wrote|rendered)/.test(l) ? "ok" : ""}">${escapeHtml(l)}</div>`).join("");
+    if (job.status === "running") return setTimeout(poll, 500);
+    $("#applyGo").disabled = false;
+    $("#progress i").style.width = job.status === "done" ? "100%" : "0";
+    if (job.status === "done") $("#jobLog").innerHTML += `<div class="ok">完了。Premiere で XML を「ファイル › 読み込み」してください。</div>`;
+  }
+  const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  // ---------- boot ----------
+  api("/api/state").then(setState).catch((e) => { document.body.innerHTML = `<p style="padding:20px">読み込みに失敗しました: ${e.message}</p>`; });
+})();
+</script>
+</body>
+</html>
