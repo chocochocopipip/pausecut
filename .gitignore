@@ -4,3 +4,4 @@ dist/
 *.pausecut.csv
 *.pausecut.xml
 *.pausecut.edl
+*.tgz
